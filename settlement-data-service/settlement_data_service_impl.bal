@@ -70,180 +70,179 @@ public function addSettlement (http:Request req, model:SettlementDAO settlement)
     return res;
 }
 
-// public function getOrders (http:Request req)
-//                     returns http:Response {
+public function getSettlements (http:Request req) returns http:Response {
 
-//     int retryCount = config:getAsInt("order.data.service.default.retryCount");
-//     int resultsLimit = config:getAsInt("order.data.service.default.resultsLimit");
-//     string processFlag = config:getAsString("order.data.service.default.processFlag");
+    int retryCount = config:getAsInt("settlement.data.service.default.retryCount");
+    int resultsLimit = config:getAsInt("settlement.data.service.default.resultsLimit");
+    string processFlag = config:getAsString("settlement.data.service.default.processFlag");
 
-//     map<string> params = req.getQueryParams();
+    map<string> params = req.getQueryParams();
 
-//     if (params.hasKey("processFlag")) {
-//         processFlag = params.processFlag;
-//     }
+    if (params.hasKey("processFlag")) {
+        processFlag = params.processFlag;
+    }
 
-//     if (params.hasKey("maxRetryCount")) {
-//         match <int> params.maxRetryCount {
-//             int n => {
-//                 retryCount = n;
-//             }
-//             error err => {
-//                 throw err;
-//             }
-//         }
-//     }
+    if (params.hasKey("maxRetryCount")) {
+        match <int> params.maxRetryCount {
+            int n => {
+                retryCount = n;
+            }
+            error err => {
+                throw err;
+            }
+        }
+    }
 
-//     if (params.hasKey("maxRecords")) {
-//         match <int> params.maxRecords {
-//             int n => {
-//                 resultsLimit = n;
-//             }
-//             error err => {
-//                 throw err;
-//             }
-//         }
-//     }
+    if (params.hasKey("maxRecords")) {
+        match <int> params.maxRecords {
+            int n => {
+                resultsLimit = n;
+            }
+            error err => {
+                throw err;
+            }
+        }
+    }
 
-//     string sqlString = "select * from order_import_request where PROCESS_FLAG in ( ? ) 
-//         and RETRY_COUNT <= ? order by TRANSACTION_ID asc limit ?";
+    string sqlString = "select * from settlement where PROCESS_FLAG in ( ? ) 
+        and RETRY_COUNT <= ? order by TRANSACTION_ID asc limit ?";
 
-//     string[] processFlagArray = processFlag.split(",");
-//     sql:Parameter processFlagPara = { sqlType: sql:TYPE_VARCHAR, value: processFlagArray };
+    string[] processFlagArray = processFlag.split(",");
+    sql:Parameter processFlagPara = { sqlType: sql:TYPE_VARCHAR, value: processFlagArray };
 
-//     var ret = orderDB->select(sqlString, model:OrderDAO, loadToMemory = true, processFlagPara, retryCount, resultsLimit);
+    var ret = settlementDB->select(sqlString, model:SettlementDAO, loadToMemory = true, processFlagPara, retryCount, resultsLimit);
 
-//     http:Response resp = new;
-//     json[] jsonReturnValue;
-//     match ret {
-//         table<model:OrderDAO> tableOrderDAO => {
-//             foreach orderRec in tableOrderDAO {
-//                 io:StringReader sr = new(check mime:base64DecodeString(orderRec.request.toString()));
-//                 json requestJson = check sr.readJson();
-//                 orderRec.request = requestJson;
-//                 jsonReturnValue[lengthof jsonReturnValue] = check <json> orderRec;
-//             }
-//             io:println(jsonReturnValue);
-//             resp.setJsonPayload(untaint jsonReturnValue);
-//             resp.statusCode = http:OK_200;
-//         }
-//         error err => {
-//             json respPayload = { "Status": "Internal Server Error", "Error": err.message };
-//             resp.setJsonPayload(untaint respPayload);
-//             resp.statusCode = http:INTERNAL_SERVER_ERROR_500;
-//         }
-//     }
+    http:Response resp = new;
+    json[] jsonReturnValue;
+    match ret {
+        table<model:SettlementDAO> tableSettlementDAO => {
+            foreach settlement in tableSettlementDAO {
+                io:StringReader sr = new(check mime:base64DecodeString(settlement.request.toString()));
+                json requestJson = check sr.readJson();
+                settlement.request = requestJson;
+                jsonReturnValue[lengthof jsonReturnValue] = check <json> settlement;
+            }
 
+            resp.setJsonPayload(untaint jsonReturnValue);
+            resp.statusCode = http:OK_200;
+        }
+        error err => {
+            json respPayload = { "Status": "Internal Server Error", "Error": err.message };
+            resp.setJsonPayload(untaint respPayload);
+            resp.statusCode = http:INTERNAL_SERVER_ERROR_500;
+        }
+    }
+
+    return resp;
+}
+
+public function updateProcessFlag (http:Request req, model:SettlementDAO settlement)
+                    returns http:Response {
+
+    log:printInfo("Calling settlementDB->updateProcessFlag for tid : " + settlement.transactionId);
+
+    string sqlString = "UPDATE settlement SET PROCESS_FLAG = ?, RETRY_COUNT = ?, ERROR_MESSAGE = ?, 
+                            LAST_UPDATED_TIME = CURRENT_TIMESTAMP where TRANSACTION_ID = ?";
+
+    json resJson;
+    boolean isSuccessful;
+    transaction with retries = 5, oncommit = onCommitFunction, onabort = onAbortFunction {                              
+
+        var ret = settlementDB->update(sqlString, settlement.processFlag, settlement.retryCount, 
+                                    settlement.errorMessage, settlement.transactionId);
+
+        match ret {
+            int updatedRows => {
+                if (updatedRows < 1) {
+                    log:printError("Calling settlementDB->updateProcessFlag for tid : " + settlement.transactionId + 
+                                " failed", err = ());
+                    isSuccessful = false;
+                    abort;
+                } else {
+                    log:printInfo("Calling settlementDB->updateProcessFlag for tid : " + settlement.transactionId + 
+                         " succeeded");
+                    isSuccessful = true;
+                }
+            }
+            error err => {
+                log:printError("Calling settlementDB->updateProcessFlag for tid : " + settlement.transactionId +
+                    " failed", err = err);
+                isSuccessful = false;
+                retry;
+            }
+        } 
+
+    }     
+
+    int statusCode;
+    if (isSuccessful) {
+        resJson = { "Status": "ProcessFlag is updated for tid  : " + settlement.transactionId };
+        statusCode = http:ACCEPTED_202;
+    } else {
+        resJson = { "Status": "Failed to update ProcessFlag for settlement : " + settlement.transactionId };
+        statusCode = http:INTERNAL_SERVER_ERROR_500;
+    }
+
+    http:Response res = new;
+    res.setJsonPayload(resJson);
+    res.statusCode = statusCode;
+    return res;
+}
+
+public function batchUpdateProcessFlag (http:Request req, model:SettlementsDAO settlements)
+                    returns http:Response {
+
+    settlementBatchType[][] settlementBatches;
+    foreach i, settlement in settlements.settlements {
+        settlementBatchType[] ref = [settlement.processFlag, settlement.retryCount, 
+                                        settlement.errorMessage, settlement.transactionId];
+        settlementBatches[i] = ref;
+    }
     
+    string sqlString = "UPDATE settlement SET PROCESS_FLAG = ?, RETRY_COUNT = ?, ERROR_MESSAGE = ?, 
+                            LAST_UPDATED_TIME = CURRENT_TIMESTAMP where TRANSACTION_ID = ?";
 
-//     return resp;
-// }
-
-// public function updateProcessFlag (http:Request req, model:OrderDAO settlement)
-//                     returns http:Response {
-
-//     log:printInfo("Calling orderDB->updateProcessFlag for TID=" + settlement.transactionId + 
-//                     ", OrderNo=" + settlement.orderNo);
-//     string sqlString = "UPDATE order_import_request SET PROCESS_FLAG = ?, RETRY_COUNT = ?, ERROR_MESSAGE = ? 
-//                             where TRANSACTION_ID = ?";
-
-//     json resJson;
-//     boolean isSuccessful;
-//     transaction with retries = 5, oncommit = onCommitFunction, onabort = onAbortFunction {                              
-
-//         var ret = orderDB->update(sqlString, settlement.processFlag, settlement.retryCount, 
-//                                     settlement.errorMessage, settlement.transactionId);
-
-//         match ret {
-//             int updatedRows => {
-//                 if (updatedRows < 1) {
-//                     log:printError("Calling orderDB->updateProcessFlag for TID=" + settlement.transactionId + 
-//                                 ", OrderNo=" + settlement.orderNo + " failed", err = ());
-//                     isSuccessful = false;
-//                     abort;
-//                 } else {
-//                     log:printInfo("Calling orderDB->updateProcessFlag for TID=" + settlement.transactionId + 
-//                                 ", OrderNo=" + settlement.orderNo + " succeeded");
-//                     isSuccessful = true;
-//                 }
-//             }
-//             error err => {
-//                 log:printError("Calling orderDB->updateProcessFlag for TID=" + settlement.transactionId 
-//                     + " failed", err = err);
-//                 isSuccessful = false;
-//                 retry;
-//             }
-//         } 
-
-//     }     
-
-//     int statusCode;
-//     if (isSuccessful) {
-//         resJson = { "Status": "ProcessFlag is updated for order : " + settlement.transactionId };
-//         statusCode = http:ACCEPTED_202;
-//     } else {
-//         resJson = { "Status": "Failed to update ProcessFlag for order : " + settlement.transactionId };
-//         statusCode = http:INTERNAL_SERVER_ERROR_500;
-//     }
-
-//     http:Response res = new;
-//     res.setJsonPayload(resJson);
-//     res.statusCode = statusCode;
-//     return res;
-// }
-
-// public function batchUpdateProcessFlag (http:Request req, model:OrdersDAO orders)
-//                     returns http:Response {
-
-//     orderBatchType[][] orderBatches;
-//     foreach i, orderRec in orders.orders {
-//         orderBatchType[] ord = [orderRec.processFlag, orderRec.retryCount, orderRec.transactionId];
-//         orderBatches[i] = ord;
-//     }
+    log:printInfo("Calling settlementDB->batchUpdateProcessFlag");
     
-//     string sqlString = "UPDATE order_import_request SET PROCESS_FLAG = ?, RETRY_COUNT = ? where TRANSACTION_ID = ?";
+    json resJson;
+    boolean isSuccessful;
+    transaction with retries = 5, oncommit = onCommitFunction, onabort = onAbortFunction {                              
 
-//     log:printInfo("Calling orderDB->batchUpdateProcessFlag");
-    
-//     json resJson;
-//     boolean isSuccessful;
-//     transaction with retries = 5, oncommit = onCommitFunction, onabort = onAbortFunction {                              
+        var retBatch = settlementDB->batchUpdate(sqlString, ... settlementBatches);
+        match retBatch {
+            int[] counts => {
+                foreach count in counts {
+                    if (count < 1) {
+                        log:printError("Calling settlementDB->batchUpdateProcessFlag failed", err = ());
+                        isSuccessful = false;
+                        abort;
+                    } else {
+                        log:printInfo("Calling settlementDB->batchUpdateProcessFlag succeeded");
+                        isSuccessful = true;
+                    }
+                }
+            }
+            error err => {
+                log:printError("Calling settlementDB->batchUpdateProcessFlag failed", err = err);
+                retry;
+            }
+        }      
+    }     
 
-//         var retBatch = orderDB->batchUpdate(sqlString, ... orderBatches);
-//         match retBatch {
-//             int[] counts => {
-//                 foreach count in counts {
-//                     if (count < 1) {
-//                         log:printError("Calling orderDB->batchUpdateProcessFlag failed", err = ());
-//                         isSuccessful = false;
-//                         abort;
-//                     } else {
-//                         log:printInfo("Calling orderDB->batchUpdateProcessFlag succeeded");
-//                         isSuccessful = true;
-//                     }
-//                 }
-//             }
-//             error err => {
-//                 log:printError("Calling orderDB->batchUpdateProcessFlag failed", err = err);
-//                 retry;
-//             }
-//         }      
-//     }     
+    int statusCode;
+    if (isSuccessful) {
+        resJson = { "Status": "ProcessFlags updated"};
+        statusCode = http:ACCEPTED_202;
+    } else {
+        resJson = { "Status": "ProcessFlags not updated" };
+        statusCode = http:INTERNAL_SERVER_ERROR_500;
+    }
 
-//     int statusCode;
-//     if (isSuccessful) {
-//         resJson = { "Status": "ProcessFlags updated"};
-//         statusCode = http:ACCEPTED_202;
-//     } else {
-//         resJson = { "Status": "ProcessFlags not updated" };
-//         statusCode = http:INTERNAL_SERVER_ERROR_500;
-//     }
-
-//     http:Response res = new;
-//     res.setJsonPayload(resJson);
-//     res.statusCode = statusCode;
-//     return res;
-// }
+    http:Response res = new;
+    res.setJsonPayload(resJson);
+    res.statusCode = statusCode;
+    return res;
+}
 
 function onCommitFunction(string transactionId) {
     log:printInfo("Transaction: " + transactionId + " committed");
