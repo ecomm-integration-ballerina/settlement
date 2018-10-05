@@ -9,6 +9,14 @@ public type Settlement record {
     string paymentProcessor,
     string paymentMethod,
     string paymentBrand,
+    string createTime,
+    json invoiceId,
+    json creditMemoId,
+    string[] itemIds,
+    float amount,
+    float transactionFeeAmount,
+    string processorApprovalCode,
+
 };
 
 public type Settlements record {
