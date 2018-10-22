@@ -24,7 +24,7 @@ int delay = config:getAsInt("settlement.outbound.dispatcher.task.delay");
 int maxRetryCount = config:getAsInt("settlement.outbound.dispatcher.task.maxRetryCount");
 int maxRecords = config:getAsInt("settlement.outbound.dispatcher.task.maxRecords");
 
-function main(string... args) {
+public function main(string... args) {
 
     (function() returns error?) onTriggerFunction = doSettlementOutboundDispatcherETL;
 
@@ -36,7 +36,7 @@ function main(string... args) {
         interval, delay = delay);
 
     timer.start();
-    runtime:sleep(20000000);
+    runtime:sleep(20000000000);
 }
 
 function doSettlementOutboundDispatcherETL() returns  error? {
