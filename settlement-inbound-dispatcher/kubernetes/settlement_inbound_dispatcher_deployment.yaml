@@ -1,0 +1,45 @@
+---
+apiVersion: "extensions/v1beta1"
+kind: "Deployment"
+metadata:
+  annotations: {}
+  finalizers: []
+  labels:
+    app: "settlement-inbound-dispatcher"
+    integration: "settlement"
+  name: "settlement-inbound-dispatcher-deployment"
+  namespace: "default"
+  ownerReferences: []
+spec:
+  replicas: 1
+  template:
+    metadata:
+      annotations: {}
+      finalizers: []
+      labels:
+        app: "settlement-inbound-dispatcher"
+        integration: "settlement"
+      ownerReferences: []
+    spec:
+      containers:
+      - args: []
+        command: []
+        env:
+          - name: settlement_mb_host
+            value: "b7a-mb-service.default.svc.cluster.local"
+          - name: settlement_mb_port
+            value: "5672"                                                                             
+        envFrom: []
+        image: "rajkumar/settlement-inbound-dispatcher:0.1.0"
+        imagePullPolicy: "Always"
+        name: "settlement-inbound-dispatcher-deployment"
+        ports:       
+        - containerPort: 8280
+          name: http  
+        volumeMounts: []
+      hostAliases: []
+      imagePullSecrets: []
+      initContainers: []
+      nodeSelector: {}
+      tolerations: []
+      volumes: []

@@ -1,0 +1,20 @@
+---
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  annotations: {}
+  finalizers: []
+  labels:
+    app: "settlement-inbound-dispatcher"
+  name: "settlement-inbound-dispatcher-service"
+  namespace: "default"
+  ownerReferences: []
+spec:
+  externalIPs: []
+  loadBalancerSourceRanges: []
+  ports:
+  - port: 8280
+    name: http               
+  selector:
+    app: "settlement-inbound-dispatcher"
+  type: "LoadBalancer"

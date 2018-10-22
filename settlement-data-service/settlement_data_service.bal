@@ -13,6 +13,16 @@ endpoint http:Listener settlementListener {
 service<http:Service> settlementDataAPI bind settlementListener {
 
     @http:ResourceConfig {
+        methods:["GET"],
+        path: "/healthz"
+    }
+    healthz (endpoint outboundEp, http:Request req) {
+        http:Response res = new;
+        res.setJsonPayload({"message": "I'm still alive!"}, contentType = "application/json");
+        outboundEp->respond(res) but { error e => log:printError("Error while responding", err = e) };
+    } 
+    
+    @http:ResourceConfig {
         methods:["POST"],
         path: "/",
         body: "settlement"
