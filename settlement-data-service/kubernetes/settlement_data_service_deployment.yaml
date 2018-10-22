@@ -1,0 +1,74 @@
+---
+apiVersion: "extensions/v1beta1"
+kind: "Deployment"
+metadata:
+  annotations: {}
+  finalizers: []
+  labels:
+    app: "settlement-data-service"
+    integration: "settlement" 
+  name: "settlement-data-service-deployment"
+  namespace: "default"
+  ownerReferences: []
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      annotations: {}
+      finalizers: []
+      labels:
+        app: "settlement-data-service"
+        integration: "settlement"
+      ownerReferences: []
+    spec:
+      containers:
+      - args: []
+        command: []
+        env:        
+          - name: settlement_db_host
+            value: "staging-db-headless-service.default.svc.cluster.local"
+          - name: settlement_db_port
+            value: "3306"    
+          - name: settlement_db_name
+            value: "WSO2_STAGING" 
+          - name: settlement_db_username
+            valueFrom:
+              secretKeyRef:
+                name: staging-db-secret
+                key: username  
+          - name: settlement_db_password
+            valueFrom:
+              secretKeyRef:
+                name: staging-db-secret
+                key: password                   
+        envFrom: []
+        image: "rajkumar/settlement-data-service:0.1.0"
+        imagePullPolicy: "Always"
+        name: "settlement-data-service-deployment"
+        ports:       
+        - containerPort: 8280
+          name: http     
+        readinessProbe:
+          httpGet:
+            path: /data/settlement/healthz
+            port: 8280
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /data/settlement/healthz
+            port: 8280
+          initialDelaySeconds: 10
+          periodSeconds: 10              
+        volumeMounts: []
+      hostAliases: []
+      imagePullSecrets: []
+      initContainers: []
+      nodeSelector: {}
+      tolerations: []
+      volumes: []

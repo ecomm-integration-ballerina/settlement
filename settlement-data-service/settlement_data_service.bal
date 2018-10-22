@@ -4,7 +4,7 @@ import ballerina/mysql;
 import raj/settlement.model as model;
 
 endpoint http:Listener settlementListener {
-    port: 8281
+    port: 8280
 };
 
 @http:ServiceConfig {
