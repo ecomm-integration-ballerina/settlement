@@ -1,0 +1,5 @@
+kubectl delete -f settlement-outbound-sap-processor/kubernetes/settlement_outbound_sap_processor_deployment.yaml
+kubectl delete -f settlement-outbound-dispatcher/kubernetes/settlement_outbound_dispatcher_deployment.yaml
+kubectl delete -f settlement-inbound-processor/kubernetes/settlement_inbound_processor_deployment.yaml
+kubectl delete -f settlement-inbound-dispatcher/kubernetes/settlement_inbound_dispatcher_deployment.yaml
+kubectl delete -f settlement-data-service/kubernetes/settlement_data_service_deployment.yaml
