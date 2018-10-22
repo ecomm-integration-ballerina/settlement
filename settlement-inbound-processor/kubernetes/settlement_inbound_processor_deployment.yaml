@@ -1,0 +1,47 @@
+---
+apiVersion: "extensions/v1beta1"
+kind: "Deployment"
+metadata:
+  annotations: {}
+  finalizers: []
+  labels:
+    app: "settlement-inbound-processor"
+    integration: "settlement"
+  name: "settlement-inbound-processor-deployment"
+  namespace: "default"
+  ownerReferences: []
+spec:
+  replicas: 1
+  template:
+    metadata:
+      annotations: {}
+      finalizers: []
+      labels:
+        app: "settlement-inbound-processor"
+        integration: "settlement"
+      ownerReferences: []
+    spec:
+      containers:
+      - args: []
+        command: []
+        env:
+          - name: settlement_mb_host
+            value: "b7a-mb-service.default.svc.cluster.local"
+          - name: settlement_mb_port
+            value: "5672"
+          - name: settlement_data_service_url
+            value: "http://settlement-data-service-service.default.svc.cluster.local:8280/data/settlement"                                   
+        envFrom: []
+        image: "rajkumar/settlement-inbound-processor:0.1.0"
+        imagePullPolicy: "Always"
+        name: "settlement-inbound-processor-deployment"
+        ports:       
+        - containerPort: 8280
+          name: http         
+        volumeMounts: []
+      hostAliases: []
+      imagePullSecrets: []
+      initContainers: []
+      nodeSelector: {}
+      tolerations: []
+      volumes: []
