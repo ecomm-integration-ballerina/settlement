@@ -8,12 +8,12 @@ import wso2/soap;
 import raj/settlement.model as model;
 
 type Address record {
-    string countryCode,
-    string stateCode,
-    string add1,
-    string add2,
-    string city,
-    string zip,
+    string countryCode;
+    string stateCode;
+    string add1;
+    string add2;
+    string city;
+    string zip;
 };
 
 int maxRetryCount = config:getAsInt("settlement.outbound.sap.maxRetryCount");
@@ -41,7 +41,7 @@ function processSettlementToSap (model:SettlementDAO settlementDAORec) returns b
     };
 
     log:printInfo("Sending settlement to sap tid : " + tid + ", order : " + orderNo
-                        + ". Payload:\n" + io:sprintf("%l", idoc));
+                        + ". Payload:\n" + io:sprintf("%s", idoc));
 
     var ret = sapClient->sendReceive("/", soapRequest);
 
