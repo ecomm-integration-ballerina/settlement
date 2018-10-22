@@ -28,6 +28,12 @@ endpoint soap:Client sapClient {
     }
 };
 
+endpoint mb:SimpleQueueSender tmcQueue {
+    host: config:getAsString("tmc.mb.host"),
+    port: config:getAsInt("tmc.mb.port"),
+    queueName: config:getAsString("tmc.mb.queueName")
+};
+
 function processSettlementToSap (model:SettlementDAO settlementDAORec) returns boolean {
 
     int tid = settlementDAORec.transactionId;
@@ -45,6 +51,7 @@ function processSettlementToSap (model:SettlementDAO settlementDAORec) returns b
 
     var ret = sapClient->sendReceive("/", soapRequest);
 
+    boolean success;
     match ret {
         soap:SoapResponse soapResponse => {
 
@@ -52,12 +59,13 @@ function processSettlementToSap (model:SettlementDAO settlementDAORec) returns b
             if (payload.msg.getTextValue() == "Errored") {
 
                 log:printInfo("Failed to send settlement to sap tid :  " + tid + ", order : " + orderNo
-                    + ". Payload : " + io:sprintf("%l", payload));
+                    + ". Payload : " + io:sprintf("%s", payload));
                 updateProcessFlag(tid, orderNo, retryCount + 1, "E", "Errored");
             } else {
 
                 log:printInfo("Sent settlement to sap tid : " + tid + ", order : " + orderNo);
                 updateProcessFlag(tid, orderNo, retryCount, "C", "Sent to SAP");
+                success = true;
             }
         }
         soap:SoapError soapError => {
@@ -65,6 +73,12 @@ function processSettlementToSap (model:SettlementDAO settlementDAORec) returns b
                 + ". Payload : " + soapError.message);
             updateProcessFlag(tid, orderNo, retryCount + 1, "E", soapError.message);
         }
+    }
+
+    if (success) {
+        publishToTMCQueue(<string> idoc, orderNo, "SENT");
+    } else {
+        publishToTMCQueue(<string> idoc, orderNo, "NOT_SENT");
     }
 
     return true;
@@ -175,4 +189,46 @@ function createIDOC (model:SettlementDAO settlementDAORec) returns xml {
 
     settlements.selectDescendants("IDOC").setChildren(settlementsHeader + settlementsData);
     return settlements;
+}
+
+function publishToTMCQueue (string req, string orderNo, string status) {
+
+    time:Time time = time:currentTime();
+    string transactionDate = time.format("yyyyMMddHHmmssSSS");
+    json payload = {
+        "externalKey": null,
+        "processInstanceID": orderNo,
+        "receiverDUNSno":"ECC" ,
+        "senderDUNSno": "OPS",
+        "transactionDate": transactionDate,
+        "version": "V01",
+        "transactionFlow": "OUTBOUND",
+        "transactionStatus": status,
+        "documentID": null,
+        "documentName": "SETTLEMENT_OPS_ECC",
+        "documentNo": "SETTLEMENT_OPS_ECC_" + orderNo,
+        "documentSize": null,
+        "documentStatus": status,
+        "documentType": "xml",
+        "payload": req,
+        "appName": "SETTLEMENT_OPS_ECC",
+        "documentFilename": null
+     };
+
+    match (tmcQueue.createTextMessage(payload.toString())) {
+        error err => {
+            log:printError("!Queued in tmcQueue", err=err);
+        }
+        mb:Message msg => {
+            var ret = tmcQueue->send(msg);
+            match ret {
+                error err => {
+                    log:printError("!Queued in tmcQueue", err=err);
+                }
+                () => {
+                    log:printInfo("Queued in tmcQueue");
+                }
+            }
+        }
+    }
 }
